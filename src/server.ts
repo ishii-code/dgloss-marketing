@@ -149,6 +149,7 @@ app.post('/api/inquiries/ingest', async (req, res) => {
   if (token !== expected) { res.status(401).json({ error: 'invalid ingest token' }); return; }
 
   try {
+    await ensureSchema();
     const row = await insertInquiry({
       received_at: typeof body.received_at === 'string' ? body.received_at : null,
       channel: typeof body.channel === 'string' ? (body.channel as never) : null,
@@ -168,6 +169,7 @@ app.post('/api/inquiries/ingest', async (req, res) => {
 // ---- 集計・一覧・更新（認証） ----
 app.get('/api/inquiries/summary', requireAuth, async (req, res) => {
   try {
+    await ensureSchema();
     const summary = await getInquirySummary({
       from: typeof req.query.from === 'string' ? req.query.from : null,
       to: typeof req.query.to === 'string' ? req.query.to : null,
@@ -188,6 +190,7 @@ app.get('/api/inquiries/summary', requireAuth, async (req, res) => {
 
 app.get('/api/inquiries', requireAuth, async (req, res) => {
   try {
+    await ensureSchema();
     const rows = await listInquiries({
       from: typeof req.query.from === 'string' ? req.query.from : null,
       to: typeof req.query.to === 'string' ? req.query.to : null,
@@ -211,6 +214,7 @@ app.patch('/api/inquiries/:id', requireAuth, async (req, res) => {
   if (typeof body.industry === 'string') fields.industry = body.industry;
   if (typeof body.region === 'string') fields.region = body.region;
   try {
+    await ensureSchema();
     const ok = await updateInquiry(id, fields);
     if (!ok) { res.status(404).json({ error: 'not found or nothing to update' }); return; }
     res.json({ ok: true });
@@ -223,6 +227,7 @@ app.delete('/api/inquiries/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) { res.status(400).json({ error: 'invalid id' }); return; }
   try {
+    await ensureSchema();
     const ok = await deleteInquiry(id);
     if (!ok) { res.status(404).json({ error: 'not found' }); return; }
     res.json({ ok: true });
@@ -238,6 +243,7 @@ app.post('/api/inquiries/import', requireAuth, async (req, res) => {
   if (!csv.trim()) { res.status(400).json({ error: 'csv 文字列が必要です' }); return; }
   if (csv.length > 5_000_000) { res.status(400).json({ error: 'CSV が大きすぎます（5MB 以下）' }); return; }
   try {
+    await ensureSchema();
     const rows = parseCsv(csv);
     const { inputs, skipped } = csvRowsToInputs(rows);
     if (inputs.length === 0) { res.status(400).json({ error: '取込可能な行がありません。ヘッダ行を確認してください。', skipped }); return; }
@@ -276,16 +282,23 @@ app.get('/', (_req, res) => { res.type('html').send(DASHBOARD_HTML); });
 app.use((_req, res) => { res.status(404).json({ error: 'not found' }); });
 
 // ---- 起動 ----
+// スキーマ初期化はメモ化。失敗しても「プロセスは落とさない」。
+// DB書き込み/読み取りの各ハンドラ内で await ensureSchema() し、
+// 失敗時はそのリクエストだけ 500(JSON) を返す（DB不通でも / やタグ配信は生かす）。
 let schemaReady: Promise<void> | null = null;
 function ensureSchema(): Promise<void> {
-  if (!schemaReady) schemaReady = initInquirySchema().catch((e) => {
-    console.error('[schema] init failed:', e instanceof Error ? e.message : String(e));
-    schemaReady = null;
-    throw e;
-  });
+  if (!schemaReady) {
+    schemaReady = initInquirySchema().catch((e) => {
+      console.error('[schema] init failed:', e instanceof Error ? e.message : String(e));
+      schemaReady = null; // 次回リクエストで再試行できるようにする
+      throw e;
+    });
+  }
   return schemaReady;
 }
-if (hasDbConfigured()) { void ensureSchema(); }
+// 起動時に先行作成を試みる。ここで throw を握りつぶし、未処理 rejection で
+// 関数全体がクラッシュ(FUNCTION_INVOCATION_FAILED)しないようにする。
+if (hasDbConfigured()) { void ensureSchema().catch(() => { /* handled per-request */ }); }
 
 if (!VERCEL) {
   const port = Number(process.env.PORT ?? 3000);
