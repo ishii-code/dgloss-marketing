@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>問い合わせ流入分析 | dgloss</title>
+<style>
+  :root{
+    --bg:#F6F7F9;--surface:#fff;--border:#E5E7EB;--text:#111827;--muted:#6B7280;--faint:#9CA3AF;
+    --accent:#2563EB;--radius:14px;--shadow:0 1px 2px rgba(0,0,0,.04),0 1px 3px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0F1115;--surface:#171A21;--border:#262B36;--text:#E5E7EB;--muted:#9CA3AF;--faint:#6B7280;--shadow:none;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+  .brand{font-weight:800;font-size:16px;letter-spacing:.2px}
+  .brand .tool{color:var(--muted);font-weight:600;margin-left:8px;font-size:13px}
+  .spacer{flex:1}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  .btn:hover{border-color:var(--accent)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-primary:hover{opacity:.92}
+  main{max-width:1180px;margin:0 auto;padding:22px 20px 60px}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+  .stat-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:6px}
+  .stat-value{font-size:28px;font-weight:800;line-height:1}
+  .stat-sub{font-size:12px;color:var(--muted);margin-top:5px}
+  .stat.highlight{border-color:var(--accent);background:linear-gradient(135deg,rgba(37,99,235,.08),transparent 60%)}
+  .stat.highlight .stat-value{color:var(--accent)}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  @media (max-width:820px){.grid2,.grid3{grid-template-columns:1fr}.stat-row{grid-template-columns:1fr 1fr}}
+  .bar-wrap{height:8px;background:rgba(148,163,184,.18);border-radius:99px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:99px;transition:width .4s ease}
+  .tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{text-align:left;padding:8px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);border-bottom:1px solid var(--border)}
+  .tbl td{padding:9px 10px;border-bottom:1px solid var(--border);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tbl tr:last-child td{border-bottom:none}
+  .empty{padding:34px;text-align:center;color:var(--faint);font-size:13px}
+  input,select,textarea{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  code{background:rgba(148,163,184,.16);padding:1px 5px;border-radius:5px;font-size:12px}
+  pre{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;overflow-x:auto;white-space:pre}
+  .chip{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;color:#fff}
+  /* login */
+  #login{position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:100}
+  #login.show{display:flex}
+  .login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:min(360px,90vw);box-shadow:var(--shadow);text-align:center}
+  .login-card h1{font-size:18px;margin:0 0 4px}
+  .login-card p{color:var(--muted);font-size:13px;margin:0 0 18px}
+  .login-card input{width:100%;margin-bottom:12px;text-align:center}
+  .login-card .btn-primary{width:100%}
+  .login-err{color:#DC2626;font-size:12px;min-height:16px;margin-top:8px}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-card">
+    <h1>📥 問い合わせ流入分析</h1>
+    <p>dgloss marketing</p>
+    <input id="loginPw" type="password" placeholder="パスワード" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-primary" onclick="doLogin()">ログイン</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<header class="hidden" id="appHeader">
+  <span class="brand">dgloss<span class="tool">問い合わせ流入分析</span></span>
+  <span class="spacer"></span>
+  <button class="btn" onclick="doLogout()">ログアウト</button>
+</header>
+
+<main class="hidden" id="app">
+  <div class="section" style="margin-bottom:16px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div><div style="font-size:11px;color:var(--faint);margin-bottom:4px">期間（開始）</div><input id="inqFrom" type="date"></div>
+      <div><div style="font-size:11px;color:var(--faint);margin-bottom:4px">期間（終了）</div><input id="inqTo" type="date"></div>
+      <select id="inqRange" onchange="inqApplyPreset(this.value)">
+        <option value="">期間プリセット</option>
+        <option value="30">直近30日</option>
+        <option value="90">直近90日</option>
+        <option value="ytd">今年</option>
+        <option value="all">全期間</option>
+      </select>
+      <button class="btn btn-primary" onclick="loadInquiries()">🔍 表示</button>
+      <span id="inqMsg" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <div class="stat-row" id="inqStatRow"><div class="empty">読み込み中…</div></div>
+
+  <div class="section">
+    <div class="section-title">📍 チャネル別（どこから来たか）</div>
+    <div id="inqChannels"><div class="empty">—</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="section"><div class="section-title">🔗 参照元 (utm_source)</div><div id="inqSources"><div class="empty">—</div></div></div>
+    <div class="section"><div class="section-title">📣 キャンペーン (utm_campaign)</div><div id="inqCampaigns"><div class="empty">—</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🌐 流入元ページ (landing page)</div>
+    <div id="inqLanding"><div class="empty">—</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📈 月次推移</div>
+    <div id="inqMonthly"><div class="empty">—</div></div>
+  </div>
+
+  <div class="grid3">
+    <div class="section"><div class="section-title">📊 対応ステータス</div><div id="inqStatus"><div class="empty">—</div></div></div>
+    <div class="section"><div class="section-title">🏢 業種</div><div id="inqIndustry"><div class="empty">—</div></div></div>
+    <div class="section"><div class="section-title">🗺 地域</div><div id="inqRegion"><div class="empty">—</div></div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📋 最近の問い合わせ</div>
+    <div id="inqList" style="overflow-x:auto"><div class="empty">—</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">⬆️ CSV 取込（過去分の一括登録）</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
+      1行目にヘッダ、2行目以降にデータ。対応ヘッダ例: <code>received_at, channel, utm_source, utm_campaign, company, email, industry, region, status, message</code>（日本語ヘッダも可: 日時/流入元/参照元/会社名/業種/地域/対応状況/内容 など）。
+    </div>
+    <textarea id="inqCsv" rows="5" placeholder="received_at,channel,utm_source,company,message&#10;2026-05-01,organic_search,google,ABC商事,製品について" style="width:100%;font-family:monospace;font-size:12px;resize:vertical"></textarea>
+    <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="inqCsvFile" type="file" accept=".csv,text/csv" onchange="inqLoadCsvFile(this)" style="font-size:12px;border:none;padding:0">
+      <button class="btn btn-primary" onclick="inqImportCsv()">取込む</button>
+      <span id="inqImportMsg" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🧩 計測タグの設置（自社サイトの問い合わせフォーム）</div>
+    <div id="inqEmbedBody" style="font-size:13px;color:var(--muted)">読み込み中…</div>
+  </div>
+</main>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function pct(a,b){return b>0?Math.round(a/b*100):0;}
+
+var INQ_CH_COLOR={organic_search:'#10B981',paid_search:'#F59E0B',social:'#3B82F6',referral:'#7C3AED',direct:'#9CA3AF',email:'#0EA5E9',phone:'#EF4444',event:'#EC4899',other:'#CBD5E1'};
+var INQ_ST_COLOR={new:'#3B82F6',in_progress:'#F59E0B',won:'#10B981',lost:'#9CA3AF'};
+var INQ_CH_LABEL={},INQ_ST_LABEL={new:'新規',in_progress:'対応中',won:'成約',lost:'失注'};
+
+function inqDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function inqDefaultDates(){
+  var to=new Date();var from=new Date();from.setDate(from.getDate()-89);
+  var f=document.getElementById('inqFrom'),t=document.getElementById('inqTo');
+  if(f&&!f.value)f.value=inqDateStr(from);
+  if(t&&!t.value)t.value=inqDateStr(to);
+}
+function inqApplyPreset(v){
+  var f=document.getElementById('inqFrom'),t=document.getElementById('inqTo');
+  var to=new Date();
+  if(v==='all'){f.value='';t.value='';}
+  else if(v==='ytd'){f.value=to.getFullYear()+'-01-01';t.value=inqDateStr(to);}
+  else if(v==='30'||v==='90'){var from=new Date();from.setDate(from.getDate()-(Number(v)-1));f.value=inqDateStr(from);t.value=inqDateStr(to);}
+  if(v)loadInquiries();
+}
+function inqFmtDate(iso){if(!iso)return'';var d=new Date(iso);if(isNaN(d))return esc(iso);return inqDateStr(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function inqChLabel(k){return INQ_CH_LABEL[k]||k;}
+function inqChColor(k){return INQ_CH_COLOR[k]||'#3B82F6';}
+
+function inqBars(containerId,items,total,colorFn,labelFn,showWon){
+  var el=document.getElementById(containerId);
+  if(!items||!items.length){el.innerHTML='<div class="empty">データがありません</div>';return;}
+  var max=items.reduce(function(m,it){return Math.max(m,it.count);},0)||1;
+  el.innerHTML=items.slice(0,15).map(function(it){
+    var col=colorFn?colorFn(it.key):'#3B82F6';
+    var lbl=labelFn?labelFn(it.key):it.key;
+    var p=pct(it.count,total);
+    var wonTxt=showWon&&it.won>0?' <span style="color:#10B981">成約'+it.won+'</span>':'';
+    return '<div style="margin-bottom:10px">'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">'+
+        '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:68%">'+esc(lbl)+'</span>'+
+        '<span style="color:var(--muted)">'+it.count+'件 ('+p+'%)'+wonTxt+'</span></div>'+
+      '<div class="bar-wrap"><div class="bar-fill" style="width:'+Math.round(it.count/max*100)+'%;background:'+col+'"></div></div>'+
+    '</div>';
+  }).join('');
+}
+
+function inqMonthly(items){
+  var el=document.getElementById('inqMonthly');
+  if(!items||!items.length){el.innerHTML='<div class="empty">データがありません</div>';return;}
+  var max=items.reduce(function(m,it){return Math.max(m,it.count);},0)||1;
+  el.innerHTML='<div style="display:flex;align-items:flex-end;gap:8px;height:170px;padding-top:10px;overflow-x:auto">'+
+    items.map(function(it){
+      var h=Math.round(it.count/max*130)+4;
+      var wonH=it.count>0?Math.round(it.won/it.count*h):0;
+      return '<div style="display:flex;flex-direction:column;align-items:center;min-width:46px">'+
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:3px">'+it.count+'</div>'+
+        '<div style="width:28px;height:'+h+'px;background:rgba(37,99,235,.25);border-radius:5px 5px 0 0;display:flex;align-items:flex-end">'+
+          '<div style="width:100%;height:'+wonH+'px;background:#10B981"></div></div>'+
+        '<div style="font-size:10px;color:var(--faint);margin-top:6px;transform:rotate(-30deg);white-space:nowrap">'+esc(it.month)+'</div>'+
+      '</div>';
+    }).join('')+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:8px"><span style="display:inline-block;width:10px;height:10px;background:rgba(37,99,235,.25);border-radius:2px;vertical-align:middle"></span> 件数　<span style="display:inline-block;width:10px;height:10px;background:#10B981;border-radius:2px;vertical-align:middle;margin-left:8px"></span> うち成約</div>';
+}
+
+async function loadInquiries(){
+  inqDefaultDates();
+  loadInqEmbed();
+  var from=document.getElementById('inqFrom').value,to=document.getElementById('inqTo').value;
+  var q='?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to);
+  document.getElementById('inqMsg').textContent='読み込み中…';
+  try{
+    var sr=await fetch('/api/inquiries/summary'+q);
+    if(sr.status===401){showLogin();return;}
+    if(!sr.ok){document.getElementById('inqMsg').textContent='読み込みに失敗しました';return;}
+    var sd=await sr.json();var s=sd.summary;
+    INQ_CH_LABEL=sd.channel_labels||INQ_CH_LABEL;INQ_ST_LABEL=sd.status_labels||INQ_ST_LABEL;
+    document.getElementById('inqMsg').textContent='';
+
+    var topCh=s.by_channel&&s.by_channel[0];
+    document.getElementById('inqStatRow').innerHTML=
+      '<div class="stat highlight"><div class="stat-label">合計問い合わせ</div><div class="stat-value">'+s.total+'</div><div class="stat-sub">選択期間</div></div>'+
+      '<div class="stat"><div class="stat-label">トップチャネル</div><div class="stat-value" style="font-size:20px">'+(topCh?esc(inqChLabel(topCh.key)):'—')+'</div><div class="stat-sub">'+(topCh?topCh.count+'件 ('+pct(topCh.count,s.total)+'%)':'')+'</div></div>'+
+      '<div class="stat"><div class="stat-label">成約率</div><div class="stat-value">'+s.win_rate+'%</div><div class="stat-sub">成約 '+s.won+' / '+s.total+'</div></div>'+
+      '<div class="stat"><div class="stat-label">対応中 / 新規</div><div class="stat-value" style="font-size:22px">'+s.in_progress+' / '+s.new_count+'</div><div class="stat-sub">失注 '+s.lost+'</div></div>';
+
+    inqBars('inqChannels',s.by_channel,s.total,inqChColor,inqChLabel,true);
+    inqBars('inqSources',s.by_source,s.total,null,null,true);
+    inqBars('inqCampaigns',s.by_campaign,s.total,function(){return'#7C3AED';},null,true);
+    inqBars('inqLanding',s.by_landing,s.total,function(){return'#0EA5E9';},null,false);
+    inqBars('inqStatus',s.by_status,s.total,function(k){return INQ_ST_COLOR[k]||'#3B82F6';},function(k){return INQ_ST_LABEL[k]||k;},false);
+    inqBars('inqIndustry',s.by_industry,s.total,function(){return'#F59E0B';},null,true);
+    inqBars('inqRegion',s.by_region,s.total,function(){return'#EC4899';},null,true);
+    inqMonthly(s.monthly);
+
+    var lr=await fetch('/api/inquiries'+q+'&limit=200');
+    var ld=await lr.json();
+    inqRenderList(ld.inquiries||[]);
+  }catch(e){
+    document.getElementById('inqMsg').textContent='エラー: '+(e&&e.message?e.message:e);
+  }
+}
+
+function inqRenderList(rows){
+  var el=document.getElementById('inqList');
+  if(!rows.length){el.innerHTML='<div class="empty">この期間の問い合わせはありません</div>';return;}
+  var body=rows.map(function(r){
+    var who=[r.company,r.contact_name].filter(Boolean).join(' / ')||r.email||'—';
+    var src=[r.utm_source,r.utm_campaign].filter(Boolean).join(' / ')||(r.referrer?esc(r.referrer).slice(0,40):'—');
+    var chCol=inqChColor(r.channel);
+    var sel='<select onchange="inqSetStatus('+r.id+',this.value)">'+
+      ['new','in_progress','won','lost'].map(function(st){return '<option value="'+st+'"'+(r.status===st?' selected':'')+'>'+(INQ_ST_LABEL[st]||st)+'</option>';}).join('')+'</select>';
+    return '<tr>'+
+      '<td style="white-space:nowrap">'+inqFmtDate(r.received_at)+'</td>'+
+      '<td><span class="chip" style="background:'+chCol+'">'+esc(inqChLabel(r.channel))+'</span></td>'+
+      '<td title="'+esc(who)+'">'+esc(who)+'</td>'+
+      '<td title="'+esc(src)+'" style="max-width:220px">'+esc(src)+'</td>'+
+      '<td>'+sel+'</td>'+
+      '<td title="'+esc(r.message||'')+'" style="max-width:280px">'+esc((r.message||'').slice(0,80))+'</td>'+
+    '</tr>';
+  }).join('');
+  el.innerHTML='<table class="tbl"><thead><tr><th>受信日時</th><th>チャネル</th><th>会社/氏名</th><th>参照元</th><th>ステータス</th><th>内容</th></tr></thead><tbody>'+body+'</tbody></table>';
+}
+
+async function inqSetStatus(id,status){
+  try{
+    var r=await fetch('/api/inquiries/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status})});
+    if(!r.ok){alert('更新に失敗しました');return;}
+    loadInquiries();
+  }catch(e){alert('エラー: '+e);}
+}
+
+function inqLoadCsvFile(input){
+  var f=input.files&&input.files[0];if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(){document.getElementById('inqCsv').value=String(reader.result||'');};
+  reader.readAsText(f);
+}
+async function inqImportCsv(){
+  var csv=document.getElementById('inqCsv').value;
+  var msg=document.getElementById('inqImportMsg');
+  if(!csv.trim()){msg.textContent='CSVを入力してください';return;}
+  msg.textContent='取込中…';
+  try{
+    var r=await fetch('/api/inquiries/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csv:csv})});
+    var d=await r.json();
+    if(!r.ok){msg.textContent='失敗: '+(d.error||'')+(d.skipped?(' / skip '+d.skipped):'');return;}
+    msg.textContent='✅ '+d.inserted+'件取込みました'+(d.skipped?(' (skip '+d.skipped+')'):'');
+    document.getElementById('inqCsv').value='';
+    loadInquiries();
+  }catch(e){msg.textContent='エラー: '+e;}
+}
+
+async function loadInqEmbed(){
+  var el=document.getElementById('inqEmbedBody');
+  try{
+    var r=await fetch('/api/inquiries/config');if(!r.ok){el.textContent='設定を取得できませんでした';return;}
+    var c=await r.json();
+    var snippet='<script\n'+
+      '  src="'+c.script_url+'"\n'+
+      '  data-endpoint="'+c.endpoint+'"\n'+
+      '  data-token="＜INQUIRY_INGEST_TOKEN と同じ値＞"\n'+
+      '  data-form="form"\n'+
+      '  data-own-domain="'+esc(c.own_domain)+'"\n'+
+      '  defer><\/script>';
+    el.innerHTML=
+      '<div style="margin-bottom:8px">自社サイトの問い合わせフォームのページ（例: <code>'+esc(c.own_domain)+'/contact/</code>）の HTML に、以下のタグを 1 つ貼るだけで流入元(UTM・リファラ・ランディングページ)が自動計測されます。</div>'+
+      (c.ingest_enabled?'<div style="color:#059669;font-size:12px;margin-bottom:8px">✅ サーバ側の受信は有効です (INQUIRY_INGEST_TOKEN 設定済み)</div>'
+              :'<div style="color:#DC2626;font-size:12px;margin-bottom:8px">⚠️ 受信が無効です。環境変数に <code>INQUIRY_INGEST_TOKEN</code>（任意の長い文字列）を設定してください。同じ値を下の data-token に入れます。</div>')+
+      '<pre>'+esc(snippet)+'</pre>'+
+      '<div style="font-size:12px;color:var(--muted);margin-top:6px">WordPress の場合はテーマの footer.php か、ヘッダー/フッターにコードを差し込むプラグインで貼り付けられます。氏名やメールを送りたくない場合は <code>data-collect-fields="false"</code> を追加してください（流入元のみ計測）。</div>';
+  }catch(e){el.textContent='エラー: '+e;}
+}
+
+// ---- 認証 ----
+function showLogin(){
+  document.getElementById('login').classList.add('show');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('appHeader').classList.add('hidden');
+  setTimeout(function(){var el=document.getElementById('loginPw');if(el)el.focus();},50);
+}
+function showApp(){
+  document.getElementById('login').classList.remove('show');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('appHeader').classList.remove('hidden');
+  loadInquiries();
+}
+async function doLogin(){
+  var pw=document.getElementById('loginPw').value;
+  var err=document.getElementById('loginErr');err.textContent='';
+  try{
+    var r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+    var d=await r.json().catch(function(){return{};});
+    if(!r.ok){err.textContent=d.error||'ログインに失敗しました';return;}
+    document.getElementById('loginPw').value='';
+    showApp();
+  }catch(e){err.textContent='エラー: '+e;}
+}
+async function doLogout(){
+  try{await fetch('/api/logout',{method:'POST'});}catch(e){}
+  showLogin();
+}
+async function boot(){
+  try{
+    var r=await fetch('/api/me');var d=await r.json();
+    if(d.authenticated)showApp();else showLogin();
+  }catch(e){showLogin();}
+}
+boot();
+</script>
+</body>
+</html>

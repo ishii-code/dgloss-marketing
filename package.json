@@ -1,0 +1,23 @@
+{
+  "name": "dgloss-marketing",
+  "version": "1.0.0",
+  "description": "問い合わせ流入分析ツール（チャネル/UTM/業種/地域/時系列/対応状況の可視化）",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "server": "tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}
