@@ -217,7 +217,7 @@ async function loadInquiries(){
   try{
     var sr=await fetch('/api/inquiries/summary'+q);
     if(sr.status===401){showLogin();return;}
-    if(!sr.ok){document.getElementById('inqMsg').textContent='読み込みに失敗しました';return;}
+    if(!sr.ok){var ed=await sr.json().catch(function(){return{};});document.getElementById('inqMsg').innerHTML='<span style="color:#DC2626">読み込みに失敗しました'+(ed.detail?('：'+esc(ed.detail)):'')+'</span> <a href="/api/health" target="_blank" style="color:var(--accent)">DB状態を確認</a>';return;}
     var sd=await sr.json();var s=sd.summary;
     INQ_CH_LABEL=sd.channel_labels||INQ_CH_LABEL;INQ_ST_LABEL=sd.status_labels||INQ_ST_LABEL;
     document.getElementById('inqMsg').textContent='';

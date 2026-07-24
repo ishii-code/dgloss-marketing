@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import express from 'express';
 import type { Request, Response } from 'express';
-import { checkDbConnection, hasDbConfigured } from './db.js';
+import { hasDbConfigured, getPool } from './db.js';
 import {
   initInquirySchema,
   insertInquiry,
@@ -78,11 +78,30 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '6mb' }));
 
-// ---- ヘルス ----
-app.get('/api/health', (_req, res) => {
-  void checkDbConnection().then((db) => {
-    res.status(db ? 200 : 503).json({ ok: true, db_connected: db, time: new Date().toISOString() });
-  }).catch(() => res.status(503).json({ ok: false, db_connected: false }));
+// ---- ヘルス / DB診断 ----
+// DB接続を実際に試し、失敗時は原因メッセージ(db_error)とヒント(hint)を返す。
+// ブラウザで /api/health を開けば、ログを掘らなくてもDBの不調原因が分かる。
+app.get('/api/health', async (_req, res) => {
+  let db_connected = false;
+  let db_error: string | null = null;
+  let hint: string | null = null;
+  if (!hasDbConfigured()) {
+    db_error = 'SUPABASE_DATABASE_URL / DATABASE_URL が未設定です';
+  } else {
+    try {
+      await getPool().query('SELECT 1');
+      db_connected = true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      db_error = msg.slice(0, 300);
+      if (/ENOTFOUND|EAI_AGAIN/i.test(msg)) hint = '接続先が見つかりません。Supabaseの「直接接続(db.xxx.supabase.co)」ではなく「Transaction pooler(...pooler.supabase.com:6543)」のURLに変えてください。';
+      else if (/password authentication failed/i.test(msg)) hint = 'パスワードが違います。接続URLの [YOUR-PASSWORD] を実際のDBパスワードに置換したか確認（記号入りはURLエンコードが必要）。';
+      else if (/Tenant or user not found/i.test(msg)) hint = 'poolerのユーザー名が違います。postgres.<プロジェクトID> の形（例 postgres.krsnvjuxzfscaenkrvoc）か確認してください。';
+      else if (/SASL|SCRAM|client password must be a string/i.test(msg)) hint = 'パスワードが空か不正です。接続URLにパスワードが入っているか確認してください。';
+      else if (/self-signed|certificate/i.test(msg)) hint = 'SSL証明書エラー。DATABASE_SSL=true を設定してみてください。';
+    }
+  }
+  res.status(db_connected ? 200 : 503).json({ ok: true, db_connected, db_error, hint, time: new Date().toISOString() });
 });
 
 // ---- ログイン（共通パスワード） ----
